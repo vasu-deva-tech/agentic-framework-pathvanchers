@@ -29,8 +29,20 @@ class GoogleSheetsService:
             raise ValueError("SPREADSHEET_ID environment variable not set")
         
         self.client = self._authenticate()
-        self.spreadsheet = self.client.open_by_key(self.spreadsheet_id)
-        logger.info(f"Google Sheets authenticated for spreadsheet {self.spreadsheet_id}")
+        self._spreadsheet = None  # Lazy initialization
+        logger.info("Google Sheets service initialized (spreadsheet access deferred)")
+    
+    @property
+    def spreadsheet(self):
+        """Lazy load spreadsheet on first access"""
+        if self._spreadsheet is None:
+            try:
+                self._spreadsheet = self.client.open_by_key(self.spreadsheet_id)
+                logger.info(f"Spreadsheet opened: {self.spreadsheet_id}")
+            except Exception as e:
+                logger.error(f"Failed to open spreadsheet {self.spreadsheet_id}: {str(e)}")
+                raise
+        return self._spreadsheet
         
     def _authenticate(self):
         """Authenticate using base64 encoded service account credentials"""
