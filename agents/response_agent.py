@@ -229,17 +229,3 @@ Evaluate the response and return JSON with scores and feedback. Example: {{"rele
                 "tone": 0.0,
                 "feedback": f"Validation error: {str(e)}"
             }
-                    "tone": 0.5,
-                    "feedback": "Unable to evaluate response"
-                }
-            
-            return validation
-        except Exception as e:
-            logger.error(f"Error validating response: {str(e)}")
-            return {
-                "relevance": 0.0,
-                "clarity": 0.0,
-                "completeness": 0.0,
-                "tone": 0.0,
-                "feedback": f"Validation error: {str(e)}"
-            }
