@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: pathvancer-chatbot
+    runtime: docker
+    plan: free
+    
+    # Deployment source
+    repo: ${REPO}
+    branch: ${BRANCH}
+    
+    # Port configuration
+    ports:
+      - port: 8000
+    
+    # Environment variables
+    envVars:
+      - key: OPENROUTER_API_KEY
+        scope: run
+        sync: false
+      - key: SPREADSHEET_ID
+        scope: run
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        scope: run
+        sync: false
+      - key: SUPABASE_URL
+        scope: run
+        sync: false
+      - key: SUPABASE_KEY
+        scope: run
+        sync: false
+      - key: API_HOST
+        value: 0.0.0.0
+        scope: run
+      - key: API_PORT
+        value: 8000
+        scope: run
+      - key: DEBUG
+        value: "False"
+        scope: run
+    
+    # Health check configuration
+    healthCheck:
+      path: /health
+      interval: 30
+      timeout: 10
+      initialDelay: 5
+      maxRetries: 3
+    
+    # Dockerfile will be auto-detected
+    dockerfilePath: ./Dockerfile
+    
+    # Auto-restart on failure
+    autoDeploy: true
+    
+    # Region (can be overridden at deployment time)
+    region: oregon
