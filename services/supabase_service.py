@@ -1,21 +1,19 @@
 import os
 from typing import Optional, List, Dict, Any
 from supabase import create_client, Client
-from openai import OpenAI
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class SupabaseService:
-    """Service for managing embeddings and vector search in Supabase"""
+    """Service for managing vector search in Supabase with pre-existing embeddings"""
     
-    def __init__(self, openrouter_api_key: str):
+    def __init__(self):
         """
-        Initialize Supabase service with Open Router API
-        
-        Args:
-            openrouter_api_key: Open Router API key
+        Initialize Supabase service
+        Embeddings are managed externally - this service only performs searches
+        on existing embeddings already stored in Supabase
         """
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_KEY")
@@ -25,60 +23,35 @@ class SupabaseService:
         
         self.supabase: Client = create_client(supabase_url, supabase_key)
         
-        # Initialize Open Router client (OpenAI-compatible API)
-        self.openrouter_client = OpenAI(
-            api_key=openrouter_api_key,
-            base_url="https://openrouter.io/api/v1"
-        )
-        self.embedding_model = "text-embedding-3-small"
-        
-    def create_embedding(self, text: str) -> Optional[List[float]]:
-        """
-        Create embedding for text using Open Router (OpenAI-compatible)
-        
-        Args:
-            text: Text to embed
-            
-        Returns:
-            Embedding vector or None
-        """
-        try:
-            response = self.openrouter_client.embeddings.create(
-                input=text,
-                model=self.embedding_model
-            )
-            return response.data[0].embedding
-        except Exception as e:
-            logger.error(f"Error creating embedding: {str(e)}")
-            return None
+
     
     def store_document(
         self,
         content: str,
         metadata: Dict[str, Any],
+        embedding: Optional[List[float]] = None,
         table_name: str = "documents"
     ) -> Optional[Dict[str, Any]]:
         """
-        Store document with embedding in Supabase
+        Store document in Supabase (embeddings must be provided externally)
         
         Args:
             content: Document content
             metadata: Document metadata
+            embedding: Pre-generated embedding vector (optional)
             table_name: Supabase table name
             
         Returns:
             Stored document data or None
         """
         try:
-            embedding = self.create_embedding(content)
-            if not embedding:
-                return None
-            
             document = {
                 "content": content,
-                "embedding": embedding,
                 "metadata": metadata
             }
+            
+            if embedding:
+                document["embedding"] = embedding
             
             response = self.supabase.table(table_name).insert(document).execute()
             logger.info(f"Document stored successfully in {table_name}")
@@ -94,30 +67,23 @@ class SupabaseService:
         table_name: str = "documents"
     ) -> List[Dict[str, Any]]:
         """
-        Perform vector similarity search
+        Perform text-based search for documents
+        For vector similarity search, use search_knowledge_base() with a pre-generated embedding
         
         Args:
-            query: Search query
+            query: Search query (text-based keyword search)
             limit: Number of results to return
             table_name: Supabase table name
             
         Returns:
-            List of similar documents
+            List of matching documents
         """
         try:
-            query_embedding = self.create_embedding(query)
-            if not query_embedding:
-                return []
-            
-            # Using Supabase RPC for vector search
-            response = self.supabase.rpc(
-                'match_documents',
-                {
-                    'query_embedding': query_embedding,
-                    'match_threshold': 0.5,
-                    'match_count': limit
-                }
-            ).execute()
+            # Perform text-based keyword search on content
+            response = self.supabase.table(table_name).select("*").ilike(
+                "content",
+                f"%{query}%"
+            ).limit(limit).execute()
             
             results = []
             if response.data:
@@ -125,14 +91,13 @@ class SupabaseService:
                     results.append({
                         'id': item.get('id'),
                         'content': item.get('content'),
-                        'similarity': item.get('similarity', 0),
                         'metadata': item.get('metadata', {})
                     })
             
-            logger.info(f"Vector search found {len(results)} results")
+            logger.info(f"Text search found {len(results)} results for query: {query}")
             return results
         except Exception as e:
-            logger.error(f"Error performing vector search: {str(e)}")
+            logger.error(f"Error performing text search: {str(e)}")
             return []
     
     def get_document(self, doc_id: str, table_name: str = "documents") -> Optional[Dict[str, Any]]:
@@ -190,31 +155,7 @@ class SupabaseService:
             logger.error(f"Error listing documents: {str(e)}")
             return []
     
-    def generate_embedding(self, text: str) -> Optional[List[float]]:
-        """
-        Generate embedding for text using Open Router (OpenAI-compatible) text-embedding-3-small model
-        
-        Args:
-            text: Text to embed
-            
-        Returns:
-            Embedding vector (list of floats) or None if error
-        """
-        try:
-            if not text or not isinstance(text, str):
-                logger.warning("Invalid text input for embedding")
-                return None
-            
-            response = self.openrouter_client.embeddings.create(
-                input=text,
-                model=self.embedding_model
-            )
-            embedding = response.data[0].embedding
-            logger.debug(f"Generated embedding for text (length: {len(embedding)})")
-            return embedding
-        except Exception as e:
-            logger.error(f"Error generating embedding: {str(e)}")
-            return None
+
     
     def search_knowledge_base(
         self,
