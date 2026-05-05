@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 class GoogleSheetsService:
     """Service for managing session data in Google Sheets using gspread"""
     
-    SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+    SCOPES = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
     
     def __init__(self):
         """
@@ -47,8 +50,8 @@ class GoogleSheetsService:
                 scopes=self.SCOPES
             )
             
-            # Authorize and return gspread client
-            client = gspread.Authorized(auth=credentials)
+            # Authorize and return gspread client using gspread.authorize()
+            client = gspread.authorize(credentials)
             logger.info("Google Sheets service authenticated successfully")
             return client
         except Exception as e:
